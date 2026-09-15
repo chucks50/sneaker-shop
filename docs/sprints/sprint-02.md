@@ -1,4 +1,32 @@
-# Sprint 2 — Data Model & Backend Core
+frontend/
+├── src/
+│ ├── App.jsx
+│ ├── main.jsx
+│ ├── styles.css
+│ ├── api/
+│ │ ├── auth.js
+│ │ ├── products.js
+│ │ ├── cart.js
+│ │ ├── orders.js
+│ │ └── addresses.js
+│ ├── components/
+│ │ ├── Header.jsx
+│ │ ├── ProductCard.jsx
+│ │ ├── CartItem.jsx
+│ │ └── OrderCard.jsx
+│ ├── pages/
+│ │ ├── HomePage.jsx
+│ │ ├── ProductDetailPage.jsx
+│ │ ├── LoginPage.jsx
+│ │ ├── RegisterPage.jsx
+│ │ ├── CartPage.jsx
+│ │ ├── CheckoutPage.jsx
+│ │ ├── OrderConfirmationPage.jsx
+│ │ └── OrdersPage.jsx
+│ └── state/
+│ ├── auth.js
+│ ├── cart.js
+│ └── orders.js# Sprint 2 — Data Model & Backend Core
 
 ## Goal
 

@@ -1,40 +1,32 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
-
-function HomePage() {
-  return (
-    <main>
-      <h1>Sneaker Shop</h1>
-      <p>Home page placeholder for Sprint 1 setup.</p>
-      <nav>
-        <Link to="/products">Products</Link>
-        <Link to="/cart">Cart</Link>
-        <Link to="/login">Login</Link>
-      </nav>
-    </main>
-  )
-}
-
-function ProductsPage() {
-  return <h2>Products Page</h2>
-}
-
-function CartPage() {
-  return <h2>Cart Page</h2>
-}
-
-function LoginPage() {
-  return <h2>Login Page</h2>
-}
+import { Routes, Route } from 'react-router-dom';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import HomePage from './pages/HomePage';
+import ProductDetailPage from './pages/ProductDetailPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import OrdersPage from './pages/OrdersPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/login" element={<LoginPage />} />
-      </Routes>
-    </BrowserRouter>
-  )
+    <div className="app-shell">
+      <Header />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products/:productId" element={<ProductDetailPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
+  );
 }
