@@ -15,6 +15,10 @@ export async function apiFetch(path, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+    }
     throw new Error(body.detail || `Request failed: ${res.status}`);
   }
 

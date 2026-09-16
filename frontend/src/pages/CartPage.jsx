@@ -5,7 +5,7 @@ import Alert from '../components/Alert';
 import CartItem from '../components/CartItem';
 
 export default function CartPage() {
-  const { items, status, total, refresh, increaseQuantity, decreaseQuantity, removeItem } = useCart();
+  const { items, status, total, refresh, updatingItemId, increaseQuantity, decreaseQuantity, removeItem } = useCart();
 
   useEffect(() => {
     refresh();
@@ -29,6 +29,7 @@ export default function CartPage() {
         <CartItem
           key={item.id}
           item={item}
+          isUpdating={updatingItemId === item.id}
           onIncrease={() => increaseQuantity(item)}
           onDecrease={() => decreaseQuantity(item)}
           onRemove={() => removeItem(item)}

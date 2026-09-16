@@ -53,6 +53,38 @@ class ProductDetailRead(ProductRead):
     pass
 
 
+class ProductVariantInput(BaseModel):
+    size: str
+    color: str
+    stock_quantity: int = 0
+    price_override: Optional[float] = None
+
+
+class ProductAdminCreate(BaseModel):
+    name: str
+    slug: str
+    brand: str
+    description: str
+    base_price: float
+    category_slug: str = "lifestyle"
+    image_url: str = ""
+    featured: bool = False
+    variants: list[ProductVariantInput] = []
+
+
+class ProductAdminUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    brand: Optional[str] = None
+    description: Optional[str] = None
+    base_price: Optional[float] = None
+    category_slug: Optional[str] = None
+    image_url: Optional[str] = None
+    featured: Optional[bool] = None
+    is_active: Optional[bool] = None
+    variants: Optional[list[ProductVariantInput]] = None
+
+
 class UserCreate(BaseModel):
     first_name: str
     last_name: str
@@ -65,11 +97,6 @@ class UserLogin(BaseModel):
     password: str
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
 class UserRead(BaseModel):
     id: int
     email: EmailStr
@@ -78,6 +105,12 @@ class UserRead(BaseModel):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserRead
 
 
 class AddressCreate(BaseModel):
@@ -144,7 +177,7 @@ class OrderRead(BaseModel):
 
 class CheckoutRequest(BaseModel):
     address_id: int
-    payment_method: str = "card"
+    payment_method: Literal["card", "ideal"] = "card"
 
 
 class OrderStatusUpdate(BaseModel):

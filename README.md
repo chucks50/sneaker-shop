@@ -24,6 +24,25 @@ See the sprint documentation in `docs/sprints/`.
 
 ## Local Development
 
+For direct local development, copy `backend/.env.example` to `backend/.env` and
+`frontend/.env.example` to `frontend/.env`, then start the API and frontend in
+separate terminals:
+
+```bash
+cd backend
+uvicorn app.main:app --reload --port 8001
+
+cd frontend
+npm install
+npm run dev
+```
+
+The admin product screen is available at `/admin/products` after logging in
+with the email configured by `ADMIN_EMAIL`.
+
+For Docker development, create a root `.env` with a strong `JWT_SECRET_KEY`
+and `POSTGRES_PASSWORD`, then run:
+
 ```bash
 docker compose up --build
 ```
@@ -33,6 +52,10 @@ docker compose up --build
 - Frontend: Vercel or Netlify
 - Backend: Render or Railway
 - Database: Managed PostgreSQL
+
+Before deployment, set `DATABASE_URL`, `JWT_SECRET_KEY`, `ADMIN_EMAIL`,
+`POSTGRES_PASSWORD`, and the frontend `VITE_API_URL` in the hosting provider's
+secret/environment settings. Never commit a real `.env` file.
 
 ## Notes
 

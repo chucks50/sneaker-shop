@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, useReducer, useEffect } from 'react';
-import { loginUser } from '../api/auth';
+import { getCurrentUser, loginUser } from '../api/auth';
 
 const AuthContext = createContext(null);
 
@@ -25,6 +25,16 @@ function authReducer(state, action) {
 
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, undefined, loadInitialState);
+
+  useEffect(() => {
+    if (!state.token) return undefined;
+
+    getCurrentUser()
+      .then((user) => dispatch({ type: 'LOGIN', payload: { access_token: state.token, user } }))
+      .catch(() => dispatch({ type: 'LOGOUT' }));
+
+    return undefined;
+  }, [state.token]);
 
   useEffect(() => {
     if (state.token) {
@@ -53,5 +63,13 @@ export function useAuth() {
     dispatch({ type: 'LOGOUT' });
   }
 
-  return { token: state.token, user: state.user, isAuthenticated: !!state.token, login, logout };
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@example.com';
+  return {
+    token: state.token,
+    user: state.user,
+    isAuthenticated: !!state.token,
+    isAdmin: state.user?.email?.toLowerCase() === adminEmail.toLowerCase(),
+    login,
+    logout,
+  };
 }

@@ -85,6 +85,13 @@ hs_err_pid*
 
 # NodeJS GitIgnore
 
+# Local environment and database files
+.env
+backend/.env
+frontend/.env
+backend/*.db
+backend/test_app.db
+
 # Logs
 logs
 npm-debug.log*

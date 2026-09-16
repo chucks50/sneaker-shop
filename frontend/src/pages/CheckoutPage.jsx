@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../state/cart';
 import AddressForm from '../components/AddressForm';
 import Alert from '../components/Alert';
 import { checkout } from '../api/orders';
+import { getAddresses } from '../api/addresses';
 
 const PAYMENT_METHODS = [
   { id: 'ideal', label: 'iDEAL' },
@@ -18,6 +19,18 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0].id);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState(null);
+  const [addresses, setAddresses] = useState([]);
+  const [showNewAddress, setShowNewAddress] = useState(false);
+
+  useEffect(() => {
+    getAddresses()
+      .then((data) => {
+        setAddresses(data);
+        if (data.length > 0) setAddressId(data[0].id);
+        else setShowNewAddress(true);
+      })
+      .catch((err) => setErrorMessage(err.message));
+  }, []);
 
   async function handlePlaceOrder() {
     setStatus('submitting');
@@ -52,7 +65,28 @@ export default function CheckoutPage() {
 
       <section>
         <h2>Delivery address</h2>
-        <AddressForm onSuccess={setAddressId} />
+        {addresses.length > 0 && (
+          <div className="saved-addresses">
+            {addresses.map((address) => (
+              <label className="saved-address" key={address.id}>
+                <input
+                  type="radio"
+                  name="address"
+                  checked={!showNewAddress && addressId === address.id}
+                  onChange={() => {
+                    setAddressId(address.id);
+                    setShowNewAddress(false);
+                  }}
+                />
+                <span>{address.street}, {address.city} {address.postal_code}, {address.country}</span>
+              </label>
+            ))}
+            <button type="button" onClick={() => { setShowNewAddress(true); setAddressId(null); }}>
+              Use a new address
+            </button>
+          </div>
+        )}
+        {showNewAddress && <AddressForm onSuccess={(id) => { setAddressId(id); setShowNewAddress(false); }} />}
       </section>
 
       <section>

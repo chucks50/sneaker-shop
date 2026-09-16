@@ -4,15 +4,16 @@ import { useAuth } from '../state/auth';
 const links = [
     { to: "/", label: "Shop", end: true },
         { to: '/cart', label: 'Cart', protected: true },
-        { to: '/orders', label: 'Orders', protected: true },
+            { to: '/orders', label: 'Orders', protected: true },
+            { to: '/admin/products', label: 'Manage products', adminOnly: true },
         { to: '/login', label: 'Login', guestOnly: true },
         { to: '/register', label: 'Register', guestOnly: true },
 ];
 
 export default function Header() {
-    const { isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, isAdmin, logout } = useAuth();
     const visibleLinks = links.filter((link) => (
-        (!link.protected || isAuthenticated) && (!link.guestOnly || !isAuthenticated)
+        (!link.protected || isAuthenticated) && (!link.guestOnly || !isAuthenticated) && (!link.adminOnly || isAdmin)
     ));
 
     return <header className="site-header">

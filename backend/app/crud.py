@@ -5,11 +5,91 @@ from app.auth import hash_password
 
 
 def get_products(db: Session, skip: int = 0, limit: int = 20):
+    return (
+        db.query(models.Product)
+        .filter(models.Product.is_active.is_(True))
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_admin_products(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Product).offset(skip).limit(limit).all()
 
 
 def get_product(db: Session, product_id: int):
     return db.query(models.Product).filter(models.Product.id == product_id).first()
+
+
+def create_product(db: Session, product_data, category):
+    product = models.Product(
+        name=product_data.name,
+        slug=product_data.slug,
+        brand=product_data.brand,
+        description=product_data.description,
+        base_price=product_data.base_price,
+        category_id=category.id,
+        featured=product_data.featured,
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+
+    variants = product_data.variants or [
+        {"size": "42", "color": "Black / White", "stock_quantity": 0, "price_override": None}
+    ]
+    for index, variant_data in enumerate(variants):
+        variant = variant_data if isinstance(variant_data, dict) else variant_data.model_dump()
+        db.add(models.ProductVariant(
+            product_id=product.id,
+            size=variant["size"],
+            color=variant["color"],
+            sku=f"{product.slug}-{variant['size']}-{index}",
+            stock_quantity=variant["stock_quantity"],
+            price_override=variant["price_override"],
+        ))
+
+    if product_data.image_url:
+        db.add(models.ProductImage(
+            product_id=product.id,
+            url=product_data.image_url,
+            alt_text=product_data.name,
+            is_primary=True,
+        ))
+
+    db.commit()
+    db.refresh(product)
+    return product
+
+
+def update_product(db: Session, product, product_data, category=None):
+    updates = product_data.model_dump(exclude_unset=True, exclude={"category_slug", "image_url", "variants"})
+    for field, value in updates.items():
+        setattr(product, field, value)
+    if category is not None:
+        product.category_id = category.id
+    if product_data.image_url is not None:
+        image = db.query(models.ProductImage).filter_by(product_id=product.id, is_primary=True).first()
+        if image is None:
+            image = models.ProductImage(product_id=product.id, is_primary=True, alt_text=product.name)
+            db.add(image)
+        image.url = product_data.image_url
+        image.alt_text = product.name
+    if product_data.variants is not None:
+        db.query(models.ProductVariant).filter_by(product_id=product.id).delete()
+        for index, variant_data in enumerate(product_data.variants):
+            db.add(models.ProductVariant(
+                product_id=product.id,
+                size=variant_data.size,
+                color=variant_data.color,
+                sku=f"{product.slug}-{variant_data.size}-{index}",
+                stock_quantity=variant_data.stock_quantity,
+                price_override=variant_data.price_override,
+            ))
+    db.commit()
+    db.refresh(product)
+    return product
 
 
 def get_user_by_email(db: Session, email: str):

@@ -10,7 +10,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      VITE_API_URL: http://backend:8000
+      VITE_API_URL: ${VITE_API_URL:-http://backend:8000}
+      VITE_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
     depends_on:
       - backend
 
@@ -24,8 +25,9 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/sneaker_shop
-      JWT_SECRET_KEY: change-me-in-production
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@db:5432/sneaker_shop}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY before deployment}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
     depends_on:
       - db
 
@@ -35,8 +37,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: sneaker_shop
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before deployment}
     ports:
       - "5432:5432"
     volumes:
