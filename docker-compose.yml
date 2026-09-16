@@ -10,7 +10,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://backend:8000}
+      # Vite values are used by the browser, so the browser must reach the host port.
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
     depends_on:
       - backend
@@ -24,12 +25,14 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@db:5432/sneaker_shop}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/sneaker_shop}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY before deployment}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:15-alpine
@@ -43,6 +46,15 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d sneaker_shop",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

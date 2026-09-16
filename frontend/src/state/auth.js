@@ -56,6 +56,8 @@ export function useAuth() {
 
   async function login(credentials) {
     const data = await loginUser(credentials);
+    localStorage.setItem('auth_token', data.access_token);
+    localStorage.setItem('auth_user', JSON.stringify(data.user ?? null));
     dispatch({ type: 'LOGIN', payload: data });
   }
 

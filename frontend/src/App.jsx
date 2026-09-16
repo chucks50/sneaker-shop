@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -31,6 +31,7 @@ export default function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/orders/:orderId" element={<OrderDetailPage />} />
             <Route path="/admin/products" element={<AdminProductsPage />} />
+            <Route path="/admin/produts" element={<Navigate to="/admin/products" replace />} />
           </Route>
         </Routes>
       </main>
