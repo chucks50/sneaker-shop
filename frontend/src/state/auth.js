@@ -65,7 +65,7 @@ export function useAuth() {
     dispatch({ type: 'LOGOUT' });
   }
 
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@example.com';
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '2219757@talnet.com';
   return {
     token: state.token,
     user: state.user,
