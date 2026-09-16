@@ -359,3 +359,5 @@ This repository contains a working portfolio-grade webshop foundation with a
 React storefront, FastAPI backend, JWT authentication, cart and checkout flow,
 orders, PostgreSQL support, and protected product management. Payment
 processing, production hosting, and advanced administration can be added later.
+
+HEY
