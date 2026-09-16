@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById } from '../api/products';
 import { useCart } from '../state/cart';
+import Alert from '../components/Alert';
 
 export default function ProductDetailPage() {
   const { productId } = useParams();
@@ -13,6 +14,7 @@ export default function ProductDetailPage() {
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [cartError, setCartError] = useState(null);
   const [justAdded, setJustAdded] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -35,11 +37,11 @@ export default function ProductDetailPage() {
   }, [productId]);
 
   if (status === 'loading') return <p className="loading-state">Loading product&hellip;</p>;
-  if (status === 'error') return <p className="error-state">Product not found.</p>;
+  if (status === 'error') return <Alert type="error">Product not found.</Alert>;
 
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
 
-  function handleAddToCart() {
+  async function handleAddToCart() {
     setCartError(null);
     setJustAdded(false);
 
@@ -48,16 +50,12 @@ export default function ProductDetailPage() {
       return;
     }
 
-    addItem({
-      productId: product.id,
-      variantId: selectedVariant.id,
-      name: product.name,
-      price: product.price,
-      image_url: product.image_url,
-      quantity: 1,
-    });
-
-    setJustAdded(true);
+    try {
+      await addItem({ productId: product.id, variantId: selectedVariant.id, quantity: 1 });
+      setJustAdded(true);
+    } catch (err) {
+      setCartError(err.message || 'Could not add this item to your cart.');
+    }
   }
 
   return (
@@ -92,8 +90,8 @@ export default function ProductDetailPage() {
           ))}
         </fieldset>
 
-        {cartError && <p className="error-state">{cartError}</p>}
-        {justAdded && <p className="success-state">Added to cart.</p>}
+        {cartError && <Alert type="error">{cartError}</Alert>}
+        {justAdded && <Alert type="success">Added to cart.</Alert>}
 
         <button onClick={handleAddToCart}>Add to cart</button>
         {justAdded && <button onClick={() => navigate('/cart')}>Go to cart</button>}

@@ -1,7 +1,5 @@
-export const fetchAddresses = async () => {
-  return [];
-};
+import { apiFetch } from './client';
 
-export const createAddress = async () => {
-  return null;
-};
+export function createAddress(payload) {
+  return apiFetch('/api/addresses', { method: 'POST', body: JSON.stringify(payload) });
+}

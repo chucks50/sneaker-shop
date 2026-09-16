@@ -1,5 +1,6 @@
 import{ useEffect, useState } from 'react';
 import { getProducts } from '../api/products';
+import Alert from '../components/Alert';
 import ProductCard from '../components/ProductCard';
 
 export default function HomePage() {
@@ -26,7 +27,7 @@ export default function HomePage() {
   }, []);
 
   if (status === 'loading') return <p className="loading-state">Loading products&hellip;</p>;
-  if (status === 'error') return <p className="error-state">Couldn't load products. Try refreshing.</p>;
+  if (status === 'error') return <Alert type="error">Couldn't load products. Try refreshing.</Alert>;
   if (products.length === 0) return <p className="empty-state">No products available right now.</p>;
 
   return (

@@ -1,76 +1,33 @@
-import { createContext, useContext, useReducer } from 'react';
+import { apiFetch } from './client';
+import { getProductById } from './products';
 
-const CartContext = createContext(null);
+export function getCart() {
+  return apiFetch('/api/cart').then(async (items) => {
+    const products = await Promise.all(items.map((item) => getProductById(item.product_id)));
 
-function cartReducer(state, action) {
-  switch (action.type) {
-    case 'ADD_ITEM': {
-      const { productId, variantId, name, price, image_url, quantity = 1 } = action.payload;
-      const existing = state.items.find(
-        (item) => item.productId === productId && item.variantId === variantId
-      );
-
-      if (existing) {
-        return {
-          ...state,
-          items: state.items.map((item) =>
-            item === existing ? { ...item, quantity: item.quantity + quantity } : item
-          ),
-        };
-      }
+    return items.map((item, index) => {
+      const product = products[index];
+      const variant = product.variants.find((candidate) => candidate.id === item.variant_id);
 
       return {
-        ...state,
-        items: [...state.items, { productId, variantId, name, price, image_url, quantity }],
+        ...item,
+        product_name: product.name,
+        variant_label: variant?.label ?? `Variant #${item.variant_id}`,
+        price: variant?.price ?? product.price,
+        image_url: product.image_url,
       };
-    }
-
-    case 'REMOVE_ITEM':
-      return {
-        ...state,
-        items: state.items.filter(
-          (item) =>
-            !(item.productId === action.payload.productId && item.variantId === action.payload.variantId)
-        ),
-      };
-
-    case 'UPDATE_QUANTITY':
-      return {
-        ...state,
-        items: state.items.map((item) =>
-          item.productId === action.payload.productId && item.variantId === action.payload.variantId
-            ? { ...item, quantity: action.payload.quantity }
-            : item
-        ),
-      };
-
-    case 'CLEAR_CART':
-      return { ...state, items: [] };
-
-    default:
-      return state;
-  }
+    });
+  });
 }
 
-export function CartProvider({ children }) {
-  const [state, dispatch] = useReducer(cartReducer, { items: [] });
-  return <CartContext.Provider value={{ state, dispatch }}>{children}</CartContext.Provider>;
+export function addCartItem(payload) {
+  return apiFetch('/api/cart/items', { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function useCart() {
-  const ctx = useContext(CartContext);
-  if (!ctx) throw new Error('useCart must be used within a CartProvider');
+export function updateCartItem(itemId, quantity) {
+  return apiFetch(`/api/cart/items/${itemId}`, { method: 'PUT', body: JSON.stringify({ quantity }) });
+}
 
-  const { state, dispatch } = ctx;
-
-  return {
-    items: state.items,
-    itemCount: state.items.reduce((sum, item) => sum + item.quantity, 0),
-    total: state.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    addItem: (payload) => dispatch({ type: 'ADD_ITEM', payload }),
-    removeItem: (productId, variantId) => dispatch({ type: 'REMOVE_ITEM', payload: { productId, variantId } }),
-    updateQuantity: (productId, variantId, quantity) =>
-      dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, variantId, quantity } }),
-    clearCart: () => dispatch({ type: 'CLEAR_CART' }),
-  };
+export function removeCartItem(itemId) {
+  return apiFetch(`/api/cart/items/${itemId}`, { method: 'DELETE' });
 }

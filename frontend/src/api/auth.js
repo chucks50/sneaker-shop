@@ -1,11 +1,9 @@
-export const loginUser = async () => {
-  return null;
-};
+import { apiFetch } from './client';
 
-export const registerUser = async () => {
-  return null;
-};
+export function registerUser(payload) {
+  return apiFetch('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+}
 
-export const getCurrentUser = async () => {
-  return null;
-};
+export function loginUser(payload) {
+  return apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+}
