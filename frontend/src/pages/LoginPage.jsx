@@ -50,6 +50,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p>No account? <Link to="/register">Register</Link></p>
+      <p>Forgot your password? <Link to="/reset-password">Reset password</Link></p>
     </div>
   );
 }

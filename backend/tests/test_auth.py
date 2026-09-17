@@ -57,3 +57,47 @@ def test_register_and_login_flow():
     )
     assert me_response.status_code == 200
     assert me_response.json()["email"] == payload["email"]
+
+
+def test_password_reset_flow():
+    payload = {
+        "first_name": "Reset",
+        "last_name": "Tester",
+        "email": "reset@example.com",
+        "password": "secret123",
+    }
+
+    register_response = client.post("/api/auth/register", json=payload)
+    assert register_response.status_code == 200
+
+    forgot_response = client.post(
+        "/api/auth/forgot-password",
+        json={"email": payload["email"]},
+    )
+    assert forgot_response.status_code == 200
+    reset_token = forgot_response.json()["reset_token"]
+    assert reset_token
+
+    reset_response = client.post(
+        "/api/auth/reset-password",
+        json={
+            "email": payload["email"],
+            "reset_token": reset_token,
+            "new_password": "newsecret456",
+        },
+    )
+    assert reset_response.status_code == 200
+    assert reset_response.json()["message"] == "Password updated successfully."
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": payload["email"], "password": "newsecret456"},
+    )
+    assert login_response.status_code == 200
+    assert "access_token" in login_response.json()
+
+    old_login_response = client.post(
+        "/api/auth/login",
+        json={"email": payload["email"], "password": payload["password"]},
+    )
+    assert old_login_response.status_code == 401

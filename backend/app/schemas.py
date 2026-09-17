@@ -97,6 +97,21 @@ class UserLogin(BaseModel):
     password: str
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    reset_token: str
+    new_password: str
+
+
+class PasswordResetResponse(BaseModel):
+    message: str
+    reset_token: Optional[str] = None
+
+
 class UserRead(BaseModel):
     id: int
     email: EmailStr

@@ -4,7 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
-from app.auth import create_access_token, hash_password, verify_password, decode_access_token
+from app.auth import (
+    create_access_token,
+    create_reset_token,
+    decode_access_token,
+    decode_reset_token,
+    hash_password,
+    verify_password,
+)
 from app.config import settings
 from app.db import Base, SessionLocal, engine, get_db
 
@@ -253,6 +260,44 @@ def login_user(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
     user_id = int(user.id) # type: ignore
     token = create_access_token({"sub": str(user_id), "email": user.email})
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.post("/api/auth/forgot-password", response_model=schemas.PasswordResetResponse)
+def forgot_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    user = crud.get_user_by_email(db, str(request.email))
+    if user is None:
+        return {
+            "message": "If an account with that email exists, a password reset token has been created.",
+            "reset_token": None,
+        }
+
+    reset_token = create_reset_token(str(user.email))
+    return {
+        "message": "Password reset token created successfully.",
+        "reset_token": reset_token,
+    }
+
+
+@app.post("/api/auth/reset-password", response_model=schemas.PasswordResetResponse)
+def reset_password(request: schemas.PasswordResetConfirm, db: Session = Depends(get_db)):
+    user = crud.get_user_by_email(db, str(request.email))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token_payload = decode_reset_token(request.reset_token)
+    if token_payload is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    token_email = str(token_payload.get("sub", "")).lower()
+    if token_email != str(request.email).lower():
+        raise HTTPException(status_code=400, detail="Reset token does not match this account")
+
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    user.password_hash = hash_password(request.new_password)
+    db.commit()
+    return {"message": "Password updated successfully.", "reset_token": None}
 
 
 def get_current_user(
