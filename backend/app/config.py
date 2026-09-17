@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    admin_email: str = "admin@example.com"
-    cors_allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    admin_email: str = "2219757@talnet.com"
+    cors_allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173,https://sneaker-shop-ck.netlify.app"
 
 
 settings = Settings()
