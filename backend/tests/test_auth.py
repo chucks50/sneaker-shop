@@ -1,8 +1,34 @@
+import importlib
+import os
+
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app import config, main as main_module
 
-client = TestClient(app)
+client = TestClient(main_module.app)
+
+
+def test_cors_allowed_origins_can_be_overridden_for_deployment():
+    original = os.environ.get("CORS_ALLOWED_ORIGINS")
+    os.environ["CORS_ALLOWED_ORIGINS"] = "https://shop.example.com,https://admin.example.com"
+
+    try:
+        importlib.reload(config)
+        importlib.reload(main_module)
+        cors_origins = next(
+            middleware.kwargs["allow_origins"]
+            for middleware in main_module.app.user_middleware
+            if getattr(middleware, "kwargs", {}).get("allow_origins")
+        )
+        assert "https://shop.example.com" in cors_origins
+        assert "https://admin.example.com" in cors_origins
+    finally:
+        if original is None:
+            os.environ.pop("CORS_ALLOWED_ORIGINS", None)
+        else:
+            os.environ["CORS_ALLOWED_ORIGINS"] = original
+        importlib.reload(config)
+        importlib.reload(main_module)
 
 
 def test_register_and_login_flow():

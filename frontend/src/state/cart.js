@@ -19,13 +19,17 @@ export function CartProvider({ children }) {
     }
   }, []);
 
-  return createElement(CartContext.Provider, { value: { items, status, refresh } }, children);
+  return createElement(
+    CartContext.Provider,
+    { value: { items, status, updatingItemId, setUpdatingItemId, refresh } },
+    children,
+  );
 }
 
 export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error('useCart must be used within a CartProvider');
-  const { items, status, refresh } = ctx;
+  const { items, status, updatingItemId, setUpdatingItemId, refresh } = ctx;
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
