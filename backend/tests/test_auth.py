@@ -4,6 +4,7 @@ import os
 from fastapi.testclient import TestClient
 
 from app import config, main as main_module
+from app.auth import create_reset_token
 
 client = TestClient(main_module.app)
 
@@ -75,8 +76,9 @@ def test_password_reset_flow():
         json={"email": payload["email"]},
     )
     assert forgot_response.status_code == 200
-    reset_token = forgot_response.json()["reset_token"]
-    assert reset_token
+    assert "reset_token" not in forgot_response.json()
+
+    reset_token = create_reset_token(payload["email"])
 
     reset_response = client.post(
         "/api/auth/reset-password",

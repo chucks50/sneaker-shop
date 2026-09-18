@@ -109,7 +109,6 @@ class PasswordResetConfirm(BaseModel):
 
 class PasswordResetResponse(BaseModel):
     message: str
-    reset_token: Optional[str] = None
 
 
 class UserRead(BaseModel):

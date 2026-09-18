@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
@@ -266,16 +268,11 @@ def login_user(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
 def forgot_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
     user = crud.get_user_by_email(db, str(request.email))
     if user is None:
-        return {
-            "message": "If an account with that email exists, a password reset token has been created.",
-            "reset_token": None,
-        }
+        return {"message": "If an account with that email exists, a password reset email has been sent."}
 
     reset_token = create_reset_token(str(user.email))
-    return {
-        "message": "Password reset token created successfully.",
-        "reset_token": reset_token,
-    }
+    logging.warning("Password reset token for %s: %s", user.email, reset_token)
+    return {"message": "If an account with that email exists, a password reset email has been sent."}
 
 
 @app.post("/api/auth/reset-password", response_model=schemas.PasswordResetResponse)
@@ -295,9 +292,9 @@ def reset_password(request: schemas.PasswordResetConfirm, db: Session = Depends(
     if len(request.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
 
-    user.password_hash = hash_password(request.new_password)
+    user.password_hash = hash_password(request.new_password) # type: ignore
     db.commit()
-    return {"message": "Password updated successfully.", "reset_token": None}
+    return {"message": "Password updated successfully."}
 
 
 def get_current_user(
