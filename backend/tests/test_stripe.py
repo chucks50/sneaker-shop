@@ -143,7 +143,7 @@ def test_checkout_session_uses_database_prices_not_frontend(monkeypatch):
     assert body["session_id"] == "cs_test_db_price"
 
 
-def test_checkout_session_uses_stripe_dashboard_payment_methods(monkeypatch):
+def test_checkout_session_explicitly_enables_card_and_wallets(monkeypatch):
     captured = {}
 
     class FakeSession:
@@ -183,7 +183,8 @@ def test_checkout_session_uses_stripe_dashboard_payment_methods(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert "payment_method_types" not in captured
+    assert captured["payment_method_types"] == ["card"]
+    assert captured["metadata"]["requested_payment_method"] == "card"
     assert captured["metadata"]["order_id"] == str(response.json()["order_id"])
 
 

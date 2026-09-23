@@ -650,11 +650,16 @@ def create_checkout_session(
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
+            payment_method_types=["card"],
             line_items=line_items,
             success_url=f"{settings.frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.frontend_url}/cancel",
             customer_email=current_user.email, # type: ignore
-            metadata={"order_id": str(order.id), "user_id": str(user_id)},
+            metadata={
+                "order_id": str(order.id),
+                "user_id": str(user_id),
+                "requested_payment_method": checkout_data.payment_method,
+            },
         )
     except stripe.error.StripeError as exc: # type: ignore
         raise HTTPException(status_code=502, detail=f"Stripe checkout failed: {exc.user_message or 'payment service unavailable'}") from exc

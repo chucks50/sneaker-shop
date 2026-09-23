@@ -412,6 +412,19 @@ input {
   gap: 1.5rem;
 }
 
+.payment-method-note {
+  margin: 0 0 0.75rem;
+}
+
+.payment-method-option {
+  align-items: center;
+  border: 2px solid var(--mondriaan-zwart);
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+}
+
 .saved-addresses {
   display: grid;
   gap: 0.75rem;
