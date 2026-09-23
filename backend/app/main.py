@@ -647,10 +647,6 @@ def create_checkout_session(
             }
         )
 
-    payment_methods = ["card"]
-    if checkout_data.payment_method == "ideal":
-        payment_methods = ["ideal"]
-
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
@@ -658,7 +654,6 @@ def create_checkout_session(
             success_url=f"{settings.frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.frontend_url}/cancel",
             customer_email=current_user.email, # type: ignore
-            payment_method_types=payment_methods, # type: ignore
             metadata={"order_id": str(order.id), "user_id": str(user_id)},
         )
     except stripe.error.StripeError as exc: # type: ignore

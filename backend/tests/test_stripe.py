@@ -143,6 +143,50 @@ def test_checkout_session_uses_database_prices_not_frontend(monkeypatch):
     assert body["session_id"] == "cs_test_db_price"
 
 
+def test_checkout_session_uses_stripe_dashboard_payment_methods(monkeypatch):
+    captured = {}
+
+    class FakeSession:
+        def __init__(self, session_id_: str):
+            self.id = session_id_
+            self.url = f"https://checkout.stripe.com/{session_id_}"
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return FakeSession("cs_dashboard_methods")
+
+    monkeypatch.setattr(stripe.checkout.Session, "create", staticmethod(fake_create))
+
+    token = register_and_login("dashboard-payment-methods@example.com")
+    address_id = create_address(token)
+
+    db = SessionLocal()
+    try:
+        product = db.query(models.Product).first()
+        variant = db.query(models.ProductVariant).filter(models.ProductVariant.product_id == product.id).first()
+        product_id = product.id
+        variant_id = variant.id
+    finally:
+        db.close()
+
+    cart_response = client.post(
+        "/api/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": product_id, "variant_id": variant_id, "quantity": 1},
+    )
+    assert cart_response.status_code == 200
+
+    response = client.post(
+        "/api/checkout/create-session",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"address_id": address_id},
+    )
+
+    assert response.status_code == 200
+    assert "payment_method_types" not in captured
+    assert captured["metadata"]["order_id"] == str(response.json()["order_id"])
+
+
 def test_valid_successful_webhook_marks_order_paid(monkeypatch):
     stub_stripe_checkout(monkeypatch, "cs_test_success")
     token = register_and_login("webhook-success@example.com")
