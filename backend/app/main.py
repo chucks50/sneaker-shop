@@ -1,8 +1,11 @@
 import logging
+from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import stripe
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
@@ -17,7 +20,7 @@ from app.auth import (
 from app.config import settings
 from app.db import Base, SessionLocal, engine, get_db
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def seed_demo_products():
@@ -197,6 +200,7 @@ Base.metadata.create_all(bind=engine)
 seed_demo_products()
 
 app = FastAPI(title="Sneaker Shop API", version="0.1.0")
+stripe.api_key = settings.stripe_secret_key
 allowed_origins = [
     origin.strip()
     for origin in settings.cors_allowed_origins.split(",")
@@ -212,6 +216,84 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def create_order_for_checkout(db: Session, user_id: int, address_id: int, payment_method: str = "card"):
+    cart_items = crud.get_cart_items(db, user_id)
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    address = (
+        db.query(models.Address)
+        .filter(models.Address.id == address_id, models.Address.user_id == user_id)
+        .first()
+    )
+    if address is None:
+        raise HTTPException(status_code=400, detail="Address not found")
+
+    subtotal = 0.0
+    order_items = []
+    for cart_item in cart_items:
+        product = db.query(models.Product).filter(models.Product.id == cart_item.product_id).first()
+        if product is None or not product.is_active: # type: ignore
+            raise HTTPException(status_code=404, detail=f"Product {cart_item.product_id} not found")
+
+        variant = (
+            db.query(models.ProductVariant)
+            .filter(
+                models.ProductVariant.id == cart_item.variant_id,
+                models.ProductVariant.product_id == cart_item.product_id,
+            )
+            .first()
+        )
+        if variant is None:
+            raise HTTPException(status_code=404, detail=f"Variant {cart_item.variant_id} not found")
+
+        quantity = int(cart_item.quantity) # type: ignore
+        if quantity <= 0:
+            raise HTTPException(status_code=400, detail="Invalid cart item quantity")
+
+        available_stock = int(variant.stock_quantity) # type: ignore
+        if quantity > available_stock:
+            raise HTTPException(status_code=400, detail="Not enough stock available")
+
+        unit_price = variant.price_override if variant.price_override is not None else product.base_price
+        subtotal += unit_price * quantity
+        order_items.append(
+            models.OrderItem(
+                product_id=product.id,
+                variant_id=variant.id,
+                quantity=quantity,
+                unit_price=unit_price,
+                product_name_snapshot=product.name,
+            )
+        )
+
+    if not order_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    total_amount = subtotal
+    order = models.Order(
+        user_id=user_id,
+        address_id=address_id,
+        status="pending",
+        payment_status="pending",
+        subtotal=subtotal,
+        shipping_fee=0.0,
+        total_amount=total_amount,
+        payment_method=payment_method,
+        created_at=datetime.utcnow(),
+    )
+    db.add(order)
+    db.flush()
+
+    for item in order_items:
+        item.order_id = order.id
+        db.add(item)
+
+    db.commit()
+    db.refresh(order)
+    return order
 
 
 @app.get("/health")
@@ -298,9 +380,12 @@ def reset_password(request: schemas.PasswordResetConfirm, db: Session = Depends(
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ):
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
     token = credentials.credentials
     payload = decode_access_token(token)
     if payload is None:
@@ -513,6 +598,137 @@ def checkout_order(
         raise HTTPException(status_code=400, detail="Cart is empty or address is invalid")
 
     return order
+
+
+@app.post("/api/checkout/create-session", response_model=schemas.CheckoutSessionResponse)
+def create_checkout_session(
+    checkout_data: schemas.CheckoutRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=500, detail="Stripe is not configured")
+
+    user_id = int(current_user.id) # type: ignore
+    order = create_order_for_checkout(db, user_id, checkout_data.address_id, checkout_data.payment_method)
+
+    cart_items = crud.get_cart_items(db, user_id)
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    line_items = []
+    for cart_item in cart_items:
+        product = db.query(models.Product).filter(models.Product.id == cart_item.product_id).first()
+        if product is None or not product.is_active: # type: ignore
+            raise HTTPException(status_code=404, detail=f"Product {cart_item.product_id} not found")
+
+        variant = (
+            db.query(models.ProductVariant)
+            .filter(
+                models.ProductVariant.id == cart_item.variant_id,
+                models.ProductVariant.product_id == cart_item.product_id,
+            )
+            .first()
+        )
+        if variant is None:
+            raise HTTPException(status_code=404, detail=f"Variant {cart_item.variant_id} not found")
+
+        unit_price = variant.price_override if variant.price_override is not None else product.base_price
+        line_items.append(
+            {
+                "price_data": {
+                    "currency": settings.stripe_currency,
+                    "product_data": {
+                        "name": product.name,
+                    },
+                    "unit_amount": int(round(unit_price * 100)), # type: ignore
+                },
+                "quantity": int(cart_item.quantity), # type: ignore
+            }
+        )
+
+    payment_methods = ["card"]
+    if checkout_data.payment_method == "ideal":
+        payment_methods = ["ideal"]
+
+    try:
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=line_items,
+            success_url=f"{settings.frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.frontend_url}/cancel",
+            customer_email=current_user.email, # type: ignore
+            payment_method_types=payment_methods, # type: ignore
+            metadata={"order_id": str(order.id), "user_id": str(user_id)},
+        )
+    except stripe.error.StripeError as exc: # type: ignore
+        raise HTTPException(status_code=502, detail=f"Stripe checkout failed: {exc.user_message or 'payment service unavailable'}") from exc
+
+    order.stripe_checkout_session_id = session.id # type: ignore
+    order.payment_method = checkout_data.payment_method # type: ignore
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "order_id": order.id,
+        "session_id": session.id,
+        "checkout_url": session.url,
+        "payment_status": order.payment_status,
+    }
+
+
+@app.post("/api/webhooks/stripe")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    if not settings.stripe_webhook_secret:
+        raise HTTPException(status_code=500, detail="Stripe webhook secret is not configured")
+
+    payload = await request.body()
+    signature = request.headers.get("stripe-signature", "")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, settings.stripe_webhook_secret)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid Stripe payload") from exc
+    except stripe.error.SignatureVerificationError as exc: # type: ignore
+        raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature") from exc
+
+    event_type = event.get("type")
+    session = event.get("data", {}).get("object", {})
+    if event_type == "checkout.session.completed":
+        metadata = session.get("metadata") or {}
+        order_id_raw = metadata.get("order_id")
+        if order_id_raw is None:
+            return JSONResponse({"received": True})
+
+        order = db.query(models.Order).filter(models.Order.id == int(order_id_raw)).first()
+        if order is None:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.payment_status == "paid" and order.stripe_checkout_session_id == session.get("id"): # type: ignore
+            return JSONResponse({"received": True})
+
+        order.status = "paid" # type: ignore
+        order.payment_status = "paid" # type: ignore
+        order.stripe_checkout_session_id = session.get("id")
+        order.stripe_payment_intent_id = session.get("payment_intent")
+
+        db.query(models.CartItem).filter(models.CartItem.user_id == order.user_id).delete()
+        db.commit()
+        return JSONResponse({"received": True})
+
+    if event_type in {"checkout.session.expired", "payment_intent.payment_failed", "checkout.session.async_payment_failed"}:
+        metadata = session.get("metadata") or {}
+        order_id_raw = metadata.get("order_id")
+        if order_id_raw is None:
+            return JSONResponse({"received": True})
+
+        order = db.query(models.Order).filter(models.Order.id == int(order_id_raw)).first()
+        if order is not None:
+            order.status = "failed" # type: ignore
+            order.payment_status = "failed" # type: ignore
+            db.commit()
+
+    return JSONResponse({"received": True})
 
 
 @app.get("/api/orders", response_model=list[schemas.OrderRead])

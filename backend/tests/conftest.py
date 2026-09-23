@@ -1,32 +1,18 @@
 import os
-from pathlib import Path
 
 import pytest
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_app.db"
+os.environ["DATABASE_URL"] = "sqlite://"
 
 from app import models
 from app.db import SessionLocal, Base, engine
 from app.main import seed_demo_products
-
-project_root = Path(__file__).resolve().parents[1]
-test_database_path = project_root / "test_app.db"
-
-if test_database_path.exists():
-    engine.dispose()
-    test_database_path.unlink(missing_ok=True)
 
 Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture(autouse=True)
 def reset_database():
-    engine.dispose()
-    if test_database_path.exists():
-        test_database_path.unlink(missing_ok=True)
-
-    Base.metadata.create_all(bind=engine)
-
     db = SessionLocal()
     try:
         db.query(models.OrderItem).delete()
@@ -61,7 +47,3 @@ def reset_database():
         db.commit()
     finally:
         db.close()
-
-    engine.dispose()
-    if test_database_path.exists():
-        test_database_path.unlink(missing_ok=True)

@@ -17,6 +17,10 @@ export function checkout(payload) {
   return apiFetch('/api/orders/checkout', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeOrder);
 }
 
+export function createCheckoutSession(payload) {
+  return apiFetch('/api/checkout/create-session', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function getOrders() {
   return apiFetch('/api/orders').then((orders) => orders.map(normalizeOrder));
 }

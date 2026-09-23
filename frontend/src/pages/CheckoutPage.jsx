@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../state/cart';
 import AddressForm from '../components/AddressForm';
 import Alert from '../components/Alert';
-import { checkout } from '../api/orders';
+import { createCheckoutSession } from '../api/orders';
 import { getAddresses } from '../api/addresses';
 
 const PAYMENT_METHODS = [
@@ -37,9 +37,12 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      const order = await checkout({ address_id: addressId, payment_method: paymentMethod });
-      await refresh(); // cart should now be empty server-side after checkout
-      navigate(`/order-confirmation/${order.id}`);
+      const response = await createCheckoutSession({ address_id: addressId, payment_method: paymentMethod });
+      if (response.checkout_url) {
+        window.location.assign(response.checkout_url);
+        return;
+      }
+      throw new Error('Stripe checkout URL was not returned.');
     } catch (err) {
       setStatus('error');
       setErrorMessage(err.message);

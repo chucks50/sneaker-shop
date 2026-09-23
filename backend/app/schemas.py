@@ -179,14 +179,24 @@ class OrderRead(BaseModel):
     user_id: int
     address_id: int
     status: str
+    payment_status: str
     subtotal: float
     shipping_fee: float
     total_amount: float
     payment_method: str
+    stripe_checkout_session_id: Optional[str] = None
+    stripe_payment_intent_id: Optional[str] = None
     created_at: datetime
     items: list[OrderItemRead] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CheckoutSessionResponse(BaseModel):
+    order_id: int
+    session_id: str
+    checkout_url: str
+    payment_status: str
 
 
 class CheckoutRequest(BaseModel):
@@ -195,4 +205,4 @@ class CheckoutRequest(BaseModel):
 
 
 class OrderStatusUpdate(BaseModel):
-    status: Literal["pending", "paid", "shipped"]
+    status: Literal["pending", "paid", "failed", "cancelled", "refunded", "shipped"]

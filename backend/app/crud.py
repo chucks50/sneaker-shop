@@ -271,11 +271,15 @@ def get_order(db: Session, order_id: int, user_id: int):
 
 
 def update_order_status(db: Session, order, new_status: str):
-    allowed_statuses = {"pending", "paid", "shipped"}
+    allowed_statuses = {"pending", "paid", "failed", "cancelled", "refunded", "shipped"}
     if new_status not in allowed_statuses:
-        raise ValueError("Status must be one of: pending, paid, shipped")
+        raise ValueError("Status must be one of: pending, paid, failed, cancelled, refunded, shipped")
 
     setattr(order, "status", new_status)
+    if new_status == "paid":
+        setattr(order, "payment_status", "paid")
+    elif new_status in {"failed", "cancelled", "refunded"}:
+        setattr(order, "payment_status", new_status)
     db.commit()
     db.refresh(order)
     return order

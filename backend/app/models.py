@@ -130,10 +130,13 @@ class Order(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     address_id = Column(Integer, ForeignKey("addresses.id"), nullable=False)
     status = Column(String(50), nullable=False, default="pending")
+    payment_status = Column(String(50), nullable=False, default="pending")
     subtotal = Column(Float, nullable=False)
     shipping_fee = Column(Float, nullable=False, default=0)
     total_amount = Column(Float, nullable=False)
     payment_method = Column(String(50), nullable=False)
+    stripe_checkout_session_id = Column(String(255), nullable=True, unique=True)
+    stripe_payment_intent_id = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
 
     user = relationship("User", back_populates="orders")
