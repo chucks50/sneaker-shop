@@ -9,6 +9,8 @@ import { getAddresses } from '../api/addresses';
 const PAYMENT_METHODS = [
   { id: 'ideal', label: 'iDEAL' },
   { id: 'card', label: 'Credit card' },
+  { id: 'apple_pay', label: 'Apple Pay' },
+  { id: 'google_pay', label: 'Google Pay' },
 ];
 
 export default function CheckoutPage() {
