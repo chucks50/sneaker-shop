@@ -201,7 +201,7 @@ class CheckoutSessionResponse(BaseModel):
 
 class CheckoutRequest(BaseModel):
     address_id: int
-    payment_method: Literal["card", "ideal"] = "card"
+    payment_method: Literal["card", "ideal", "apple_pay", "google_pay"] = "card"
 
 
 class OrderStatusUpdate(BaseModel):
