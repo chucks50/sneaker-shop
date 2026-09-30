@@ -62,6 +62,13 @@ def create_address(token: str):
 
 
 def create_checkout_event(order_id: int, session_id: str = "cs_test_123"):
+    db = SessionLocal()
+    try:
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        amount_total = int(round(order.total_amount * 100))
+    finally:
+        db.close()
+
     payload = {
         "id": "evt_test_123",
         "object": "event",
@@ -71,9 +78,10 @@ def create_checkout_event(order_id: int, session_id: str = "cs_test_123"):
                 "id": session_id,
                 "object": "checkout.session",
                 "payment_intent": "pi_test_123",
+                "payment_status": "paid",
                 "metadata": {"order_id": str(order_id), "user_id": "1"},
-                "amount_total": 19999,
-                "currency": "eur",
+                "amount_total": amount_total,
+                "currency": settings.stripe_currency,
             }
         },
     }
@@ -143,7 +151,7 @@ def test_checkout_session_uses_database_prices_not_frontend(monkeypatch):
     assert body["session_id"] == "cs_test_db_price"
 
 
-def test_checkout_session_explicitly_enables_card_and_wallets(monkeypatch):
+def test_checkout_session_uses_stripe_dynamic_payment_methods(monkeypatch):
     captured = {}
 
     class FakeSession:
@@ -183,9 +191,26 @@ def test_checkout_session_explicitly_enables_card_and_wallets(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert captured["payment_method_types"] == ["card"]
-    assert captured["metadata"]["requested_payment_method"] == "card"
+    assert "payment_method_types" not in captured
     assert captured["metadata"]["order_id"] == str(response.json()["order_id"])
+    assert captured["metadata"]["user_id"]
+
+    monkeypatch.setattr(
+        stripe.checkout.Session,
+        "retrieve",
+        staticmethod(lambda session_id: {
+            "id": session_id,
+            "payment_status": "paid",
+            "metadata": {"order_id": str(response.json()["order_id"]), "user_id": captured["metadata"]["user_id"]},
+        }),
+    )
+    status_response = client.get(
+        "/api/checkout/session-status",
+        params={"session_id": "cs_dashboard_methods"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert status_response.status_code == 200
+    assert status_response.json()["payment_status"] == "paid"
 
 
 def test_valid_successful_webhook_marks_order_paid(monkeypatch):

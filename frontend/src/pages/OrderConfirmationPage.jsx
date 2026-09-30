@@ -30,5 +30,5 @@ export default function OrderConfirmationPage() {
         <Link to="/orders"><button>View orders</button></Link>
       </div>
     </div>
-  );
+);
 }

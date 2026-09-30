@@ -13,12 +13,13 @@ function normalizeOrder(order) {
   };
 }
 
-export function checkout(payload) {
-  return apiFetch('/api/orders/checkout', { method: 'POST', body: JSON.stringify(payload) }).then(normalizeOrder);
-}
-
 export function createCheckoutSession(payload) {
   return apiFetch('/api/checkout/create-session', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function getCheckoutSessionStatus(sessionId) {
+  const query = new URLSearchParams({ session_id: sessionId });
+  return apiFetch('/api/checkout/session-status?' + query.toString());
 }
 
 export function getOrders() {

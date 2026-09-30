@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
+import stripe
 
+from app.config import settings
 from app.db import SessionLocal
 from app.main import app
 from app import models
@@ -7,7 +9,18 @@ from app import models
 client = TestClient(app)
 
 
-def test_checkout_flow():
+def stub_checkout_session(monkeypatch):
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_checkout")
+
+    class FakeSession:
+        id = "cs_test_order_flow"
+        url = "https://checkout.stripe.com/cs_test_order_flow"
+
+    monkeypatch.setattr(stripe.checkout.Session, "create", staticmethod(lambda **kwargs: FakeSession()))
+
+
+def test_checkout_flow(monkeypatch):
+    stub_checkout_session(monkeypatch)
     email = "checkout-user@example.com"
     register_response = client.post(
         "/api/auth/register",
@@ -48,26 +61,25 @@ def test_checkout_flow():
     address_id = address_response.json()["id"]
 
     checkout_response = client.post(
-        "/api/orders/checkout",
+        "/api/checkout/create-session",
         headers={"Authorization": f"Bearer {token}"},
-        json={"address_id": address_id, "payment_method": "card"},
+        json={"address_id": address_id},
     )
     assert checkout_response.status_code == 200
-    payload = checkout_response.json()
-    assert payload["status"] == "pending"
-    assert payload["user_id"] > 0
-    assert payload["total_amount"] > 0
-    assert len(payload["items"]) >= 1
-
+    assert checkout_response.json()["checkout_url"].startswith("https://checkout.stripe.com/")
     orders_response = client.get(
         "/api/orders",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert orders_response.status_code == 200
-    assert len(orders_response.json()) >= 1
+    assert len(orders_response.json()) == 1
+    assert orders_response.json()[0]["payment_method"] == "stripe"
+    assert orders_response.json()[0]["payment_status"] == "pending"
 
 
-def test_order_status_update_and_detail():
+
+def test_order_status_update_and_detail(monkeypatch):
+    stub_checkout_session(monkeypatch)
     email = "order-status@example.com"
     register_response = client.post(
         "/api/auth/register",
@@ -106,27 +118,26 @@ def test_order_status_update_and_detail():
     assert address_response.status_code == 200
 
     checkout_response = client.post(
-        "/api/orders/checkout",
+        "/api/checkout/create-session",
         headers={"Authorization": f"Bearer {token}"},
-        json={"address_id": address_response.json()["id"], "payment_method": "card"},
+        json={"address_id": address_response.json()["id"]},
     )
     assert checkout_response.status_code == 200
-    order_id = checkout_response.json()["id"]
+    order_id = checkout_response.json()["order_id"]
 
     patch_response = client.patch(
         f"/api/orders/{order_id}/status",
         headers={"Authorization": f"Bearer {token}"},
         json={"status": "paid"},
     )
-    assert patch_response.status_code == 200
-    assert patch_response.json()["status"] == "paid"
+    assert patch_response.status_code == 403
 
     detail_response = client.get(
         f"/api/orders/{order_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert detail_response.status_code == 200
-    assert detail_response.json()["status"] == "paid"
+    assert detail_response.json()["payment_status"] == "pending"
 
 
 def test_checkout_rejects_insufficient_stock():

@@ -5,17 +5,10 @@ import Alert from '../components/Alert';
 import { createCheckoutSession } from '../api/orders';
 import { getAddresses } from '../api/addresses';
 
-const PAYMENT_METHODS = [
-  { id: 'card', label: 'Credit card' },
-  { id: 'apple_pay', label: 'Apple Pay' },
-  { id: 'google_pay', label: 'Google Pay' },
-];
-
 export default function CheckoutPage() {
   const { items, total } = useCart();
 
   const [addressId, setAddressId] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0].id);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState(null);
   const [addresses, setAddresses] = useState([]);
@@ -36,7 +29,7 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      const response = await createCheckoutSession({ address_id: addressId, payment_method: paymentMethod });
+      const response = await createCheckoutSession({ address_id: addressId });
       if (response.checkout_url) {
         window.location.assign(response.checkout_url);
         return;
@@ -92,21 +85,8 @@ export default function CheckoutPage() {
       </section>
 
       <section>
-        <h2>Payment method</h2>
-        <p className="payment-method-note">
-          Apple Pay and Google Pay are offered by Stripe when enabled for your account and supported by your device and browser.
-        </p>
-        {PAYMENT_METHODS.map((method) => (
-          <label className="payment-method-option" key={method.id}>
-            <input
-              type="radio"
-              name="payment"
-              checked={paymentMethod === method.id}
-              onChange={() => setPaymentMethod(method.id)}
-            />
-            {method.label}
-          </label>
-        ))}
+        <h2>Payment</h2>
+        <p>Continue to Stripe's secure checkout to choose from the payment methods enabled for this store.</p>
       </section>
 
       {errorMessage && <Alert type="error">{errorMessage}</Alert>}
