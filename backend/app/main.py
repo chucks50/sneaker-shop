@@ -635,6 +635,7 @@ def create_checkout_session(
                 "order_id": str(order.id),
                 "user_id": str(user_id),
             },
+            payment_method_configuration=settings.stripe_payment_method_configuration,
         )
     except stripe.error.StripeError as exc: # type: ignore
         order.payment_status = "failed" # type: ignore

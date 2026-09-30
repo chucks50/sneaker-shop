@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_test_secret")
     frontend_url: str = "http://localhost:5173"
     stripe_currency: str = "eur"
+    stripe_payment_method_configuration: str = os.getenv(
+    "STRIPE_PAYMENT_METHOD_CONFIGURATION",
+    ""
+)
 
 
 settings = Settings()
