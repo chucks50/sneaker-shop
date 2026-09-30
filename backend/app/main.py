@@ -577,29 +577,6 @@ def remove_cart_item(
     return {"detail": "Item removed from cart"}
 
 
-@app.post("/api/orders/checkout", response_model=schemas.OrderRead)
-def checkout_order(
-    checkout_data: schemas.CheckoutRequest,
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    user_id = int(current_user.id) # type: ignore
-    try:
-        order = crud.create_order_from_cart(
-            db,
-            user_id,
-            checkout_data.address_id,
-            checkout_data.payment_method,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    if order is None:
-        raise HTTPException(status_code=400, detail="Cart is empty or address is invalid")
-
-    return order
-
-
 @app.post("/api/checkout/create-session", response_model=schemas.CheckoutSessionResponse)
 def create_checkout_session(
     checkout_data: schemas.CheckoutRequest,
@@ -610,7 +587,7 @@ def create_checkout_session(
         raise HTTPException(status_code=500, detail="Stripe is not configured")
 
     user_id = int(current_user.id) # type: ignore
-    order = create_order_for_checkout(db, user_id, checkout_data.address_id, checkout_data.payment_method)
+    order = create_order_for_checkout(db, user_id, checkout_data.address_id, "stripe")
 
     cart_items = crud.get_cart_items(db, user_id)
     if not cart_items:
@@ -650,7 +627,6 @@ def create_checkout_session(
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
-            payment_method_types=["card"],
             line_items=line_items,
             success_url=f"{settings.frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.frontend_url}/cancel",
@@ -658,14 +634,16 @@ def create_checkout_session(
             metadata={
                 "order_id": str(order.id),
                 "user_id": str(user_id),
-                "requested_payment_method": checkout_data.payment_method,
             },
         )
     except stripe.error.StripeError as exc: # type: ignore
+        order.payment_status = "failed" # type: ignore
+        order.status = "failed" # type: ignore
+        db.commit()
         raise HTTPException(status_code=502, detail=f"Stripe checkout failed: {exc.user_message or 'payment service unavailable'}") from exc
 
     order.stripe_checkout_session_id = session.id # type: ignore
-    order.payment_method = checkout_data.payment_method # type: ignore
+    order.payment_method = "stripe" # type: ignore
     db.commit()
     db.refresh(order)
 
@@ -675,6 +653,43 @@ def create_checkout_session(
         "checkout_url": session.url,
         "payment_status": order.payment_status,
     }
+
+
+@app.get("/api/checkout/session-status")
+def checkout_session_status(
+    session_id: str = Query(min_length=1),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=500, detail="Stripe is not configured")
+
+    order = (
+        db.query(models.Order)
+        .filter(
+            models.Order.user_id == current_user.id,
+            models.Order.stripe_checkout_session_id == session_id,
+        )
+        .first()
+    )
+    if order is None:
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except stripe.error.InvalidRequestError as exc: # type: ignore
+        raise HTTPException(status_code=404, detail="Checkout session not found") from exc
+    except stripe.error.StripeError as exc: # type: ignore
+        raise HTTPException(status_code=502, detail="Could not confirm payment with Stripe") from exc
+
+    metadata = session.get("metadata") or {}
+    if (
+        str(metadata.get("order_id")) != str(order.id)
+        or str(metadata.get("user_id")) != str(current_user.id)
+    ):
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+
+    return {"order_id": order.id, "payment_status": session.get("payment_status", "unpaid")}
 
 
 @app.post("/api/webhooks/stripe")
@@ -694,17 +709,31 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
     event_type = event.get("type")
     session = event.get("data", {}).get("object", {})
-    if event_type == "checkout.session.completed":
+    if event_type in {"checkout.session.completed", "checkout.session.async_payment_succeeded"}:
+        if session.get("payment_status") != "paid":
+            return JSONResponse({"received": True})
+
         metadata = session.get("metadata") or {}
         order_id_raw = metadata.get("order_id")
         if order_id_raw is None:
             return JSONResponse({"received": True})
 
-        order = db.query(models.Order).filter(models.Order.id == int(order_id_raw)).first()
-        if order is None:
-            raise HTTPException(status_code=404, detail="Order not found")
+        try:
+            order_id = int(order_id_raw)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid order metadata") from exc
 
-        if order.payment_status == "paid" and order.stripe_checkout_session_id == session.get("id"): # type: ignore
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        if order is None or str(order.user_id) != str(metadata.get("user_id")):
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order.stripe_checkout_session_id != session.get("id"):
+            raise HTTPException(status_code=400, detail="Checkout session does not match order")
+        if session.get("amount_total") != int(round(order.total_amount * 100)):
+            raise HTTPException(status_code=400, detail="Checkout amount does not match order")
+        if session.get("currency") != settings.stripe_currency.lower():
+            raise HTTPException(status_code=400, detail="Checkout currency does not match order")
+
+        if order.payment_status == "paid": # type: ignore
             return JSONResponse({"received": True})
 
         order.status = "paid" # type: ignore
@@ -716,14 +745,24 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         db.commit()
         return JSONResponse({"received": True})
 
-    if event_type in {"checkout.session.expired", "payment_intent.payment_failed", "checkout.session.async_payment_failed"}:
+    if event_type in {"checkout.session.expired", "checkout.session.async_payment_failed"}:
         metadata = session.get("metadata") or {}
         order_id_raw = metadata.get("order_id")
         if order_id_raw is None:
             return JSONResponse({"received": True})
 
-        order = db.query(models.Order).filter(models.Order.id == int(order_id_raw)).first()
-        if order is not None:
+        try:
+            order_id = int(order_id_raw)
+        except (TypeError, ValueError):
+            return JSONResponse({"received": True})
+
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        if (
+            order is not None
+            and str(order.user_id) == str(metadata.get("user_id"))
+            and order.stripe_checkout_session_id == session.get("id")
+            and order.payment_status != "paid"
+        ):
             order.status = "failed" # type: ignore
             order.payment_status = "failed" # type: ignore
             db.commit()
@@ -757,13 +796,15 @@ def get_order_detail(
 def update_order_status(
     order_id: int,
     status_data: schemas.OrderStatusUpdate,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user_id = int(current_user.id) # type: ignore
-    order = crud.get_order(db, order_id, user_id)
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    if status_data.status == "paid":
+        raise HTTPException(status_code=403, detail="Payment status is controlled by Stripe")
 
     updated_order = crud.update_order_status(db, order, status_data.status)
     return updated_order
