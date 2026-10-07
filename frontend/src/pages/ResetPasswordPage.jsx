@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
       const data = await requestPasswordReset({ email });
       setStatus('success');
       setSuccessMessage(
-        `${data.message || 'If an account with that email exists, a password reset email has been sent.'} Check the server console for the demo reset token.`
+        `${data.message || 'If an account with that email exists, a password reset email has been sent.'} Check your email for the reset token.`
       );
     } catch (err) {
       setStatus('error');

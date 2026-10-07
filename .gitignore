@@ -382,3 +382,11 @@ ehthumbs.db
 $RECYCLE.BIN/
 
 _NCrunch*
+
+# Laravel migration backend
+backend/laravel/vendor/
+backend/laravel/.env
+backend/laravel/.env.*
+!backend/laravel/.env.example
+backend/laravel/bootstrap/cache/*.php
+backend/laravel/storage/*.key

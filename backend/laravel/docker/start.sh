@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+cd /var/www/html
+php artisan config:cache
+php artisan route:cache
+exec apache2-foreground
