@@ -37,13 +37,10 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
-            $detail = match ($status) {
-                401 => 'Authentication required',
-                403 => 'Forbidden',
-                404 => 'Not found',
-                default => $status < 500 ? $e->getMessage() : 'Server error',
-            };
 
-            return response()->json(['detail' => $detail], $status);
+            return response()->json([
+                'detail' => $e->getMessage(),
+                'exception' => get_class($e),
+            ], $status);
         });
-    })->create();
+    });
