@@ -7,6 +7,7 @@ use App\Services\TokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
@@ -73,18 +74,21 @@ class AuthController extends Controller
         $data = $request->validate(['email' => ['required', 'email']]);
         $user = User::query()->where('email', $data['email'])->first();
 
-        if ($user && config('mail.default') !== 'log') {
+        if ($user) {
             $token = $tokens->issueResetToken($user->email);
-            try {
-                Mail::raw(
-                    "Your Sneaker Shop password reset token is:\n\n{$token}\n\nIt expires in 15 minutes.",
-                    fn ($message) => $message->to($user->email)->subject('Password reset'),
-                );
-            } catch (\Throwable $exception) {
-                report($exception);
+            Log::warning('Password reset token for '.$user->email.': '.$token);
+
+            if (config('mail.default') !== 'log') {
+                try {
+                    Mail::raw(
+                        "Your Sneaker Shop password reset token is:\n\n{$token}\n\nIt expires in 15 minutes.",
+                        fn ($message) => $message->to($user->email)->subject('Password reset'),
+                    );
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
             }
         }
-
         return response()->json([
             'message' => 'If an account with that email exists, a password reset email has been sent.',
         ]);
